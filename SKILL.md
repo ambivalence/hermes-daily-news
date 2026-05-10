@@ -1,7 +1,7 @@
 ---
 name: daily-news-briefing
 description: Build a daily news summary agent that collects from RSS feeds across 4 categories (National, International, Business, AI/Tech), delivers summaries via Telegram, and ingests key stories into the wiki knowledge base for long-term contextual awareness.
-version: 1.0.0
+version: 1.1.0
 author: Hermes Agent
 tags: [news, rss, cron, briefing, wiki, knowledge-base, current-events]
 ---
@@ -167,7 +167,9 @@ STEP 3 — Identify notable stories for wiki ingestion:
 STEP 4 — Format the briefing for Telegram:
   - Header: "☀️ Daily News Briefing — [Day], [Date]"
   - Each category gets a header with emoji (🇺🇸 National, 🌍 International, 💼 Business, 🤖 AI & Tech)
-  - Bullet format: • [Source] Story title — 1-line summary
+  - Bullet format: "• [Source] Story title — 1-line summary. https://raw-url"
+  - Links MUST be raw URLs, NOT markdown [text](url) syntax — Telegram does not render markdown links
+  - Example: "• [NPR] Iran ceasefire tested — British military reports vessel struck. https://www.npr.org/2026/05/10/nx-s1-5817437"
   - End with "🔍 Worth Watching: [1-2 proactive suggestions]"
   - Then a "📚 [N] stories ingested to wiki" footer if applicable
   - Plain text only, no markdown. Emojis for hierarchy.
@@ -206,6 +208,23 @@ Add a `current-events` tag domain to the wiki's SCHEMA.md:
 Create a `daily-briefings/` section in the wiki for tracking what was covered each day:
 - `/opt/data/wiki/current-events/` — entity pages for notable news events
 - `/opt/data/wiki/log.md` — each daily briefing gets a log entry with key stories
+
+### The "Read More" Architecture
+
+Two approaches for deeper dives on news stories:
+
+**Option A — Links to original sources (recommended for daily briefings)**
+- The `url` field in each news item provides a direct link to the full article
+- User taps the link to read the original source
+- Pros: Zero overhead, user gets full context, no storage cost
+- Cons: Paywalls (WSJ, Bloomberg), link rot over time
+
+**Option B — Wiki deep-dive**
+- Agent ingests the story into the wiki, then user asks for a synthesis
+- Pros: No paywall, contextualized against other wiki knowledge
+- Cons: Extra agent work, wiki pollution from ephemeral content, retrieval degradation from page bloat
+
+**Decision framework:** Use Option A for the daily 8 AM bulletin (bullets + links). Use Option B only for stories that pass the two-question threshold (see below) — those get ingested into the wiki and the agent can provide enriched context on demand.
 
 ### What to Ingest — The Two-Question Threshold
 
@@ -251,11 +270,46 @@ Always read these files before writing new wiki pages:
 
 6. **User-visible times in Pacific** — Cron schedules use system local time (PDT), NOT UTC. Always reference Pacific time in the briefing and schedule.
 
-7. **No markdown in Telegram** — Explicitly forbid markdown in the cron prompt. Use emojis for visual hierarchy.
+7. **No markdown in Telegram — raw URLs only** — Telegram does NOT render markdown link syntax `[text](url)`. Links must be bare raw URLs pasted directly into the text. Explicitly forbid markdown in the cron prompt and state the raw URL rule clearly. Use emojis for visual hierarchy instead.
 
-8. **Don't overwhelm the wiki** — News is ephemeral. Don't create a page for every daily story. Use a threshold: "will I care about this in 2 weeks?" If no, skip wiki ingestion.
+8. **Test delivery format BEFORE scheduling** — Run the cron once with `cronjob(action='run', job_id='...')` and inspect the output file at `/opt/data/cron/output/<job_id>/<timestamp>.md`. Check that:
+   - Links are raw URLs, not markdown
+   - No markdown formatting snuck in
+   - Day of week in header is correct
+   - Wiki pages were actually created/updated as expected
 
-## Critical: Script Location for Cron System
+9. **Don't overwhelm the wiki — use the two-question threshold** — News is ephemeral. For each story ask: "Will this matter in 2 months?" AND "Does it connect to the AI/VC/startup thesis?" Only wiki if both are true. Classification: skip (links only), new page (genuinely new entity/event), or update existing entity page with Timeline entry.
+
+10. **Prefer updating existing entity pages over creating current-events pages** — When a notable event involves an entity already in the wiki (OpenAI, Anthropic, NVIDIA, Sequoia), add a Timeline section entry to the entity page. This keeps the knowledge graph centered on entities and avoids page sprawl.
+
+11. **Set `deliver='origin'` for Telegram chat delivery** — Use `deliver='origin'` so the cron auto-detects the current chat. If pinned to a specific chat ID (like `telegram:1234567890`), the system delivers directly. Avoid using bare `deliver='local'` unless you plan to use send_message separately.
+
+12. **Cron next_run_at shows an immediate rerun after 'run' — this is normal** — After calling `cronjob(action='run')`, the `next_run_at` will briefly show a near-future timestamp (the re-scheduling tick). The actual daily schedule resumes on the next full cycle. Check the `last_status` field to confirm the run completed successfully.
+
+## GitHub: Tracking and Sharing
+
+The collector script and skill definition can be version-controlled and shared as a public repo:
+
+```bash
+# Set up a repo for the news automation
+mkdir /tmp/hermes-news-automation
+cd /tmp/hermes-news-automation
+git init
+git branch -m main
+
+# Copy the artifacts (NOT the wiki — contains private strategy content)
+cp /opt/data/scripts/daily_news_collector.py .
+cp /opt/data/skills/productivity/daily-news-briefing/SKILL.md .
+
+# Create README.md explaining the architecture and setup
+# Push to GitHub
+git remote add origin https://github.com/YOUR_USER/hermes-daily-news.git
+git push -u origin main
+```
+
+**IMPORTANT:** Do NOT push the wiki directory (`/opt/data/wiki/`) to a public repo — it likely contains private strategy content, company profiles, and personal research. Only push the standalone collector script and skill definition.
+
+The public repo at https://github.com/ambivalence/hermes-daily-news is a reference implementation.
 
 The script lives at two locations:
 - **Development**: `/opt/data/skills/productivity/daily-news-briefing/scripts/daily_news_collector.py` (skill-managed)
@@ -270,18 +324,18 @@ cp /opt/data/skills/productivity/daily-news-briefing/scripts/daily_news_collecto
 
 - [x] Script built and tested: fetches 60 curated items from 20 feeds in ~15s
 - [x] Script written to skill at `/opt/data/skills/productivity/daily-news-briefing/scripts/daily_news_collector.py`
-- [ ] Script copied to `/opt/data/scripts/daily_news_collector.py` (needed for cron)
-- [ ] Cron job created
-- [ ] Wiki expanded with current-events schema
-- [ ] Test delivery received
+- [x] Script copied to `/opt/data/scripts/daily_news_collector.py` (needed for cron)
+- [x] Cron job created (8 AM PT)
+- [x] Wiki expanded with current-events schema and news threshold
+- [x] Test run successful — briefing delivered, wiki ingestion working
+- [x] GitHub: https://github.com/ambivalence/hermes-daily-news
 
-## User Questions (Pending — Session Reset May 10, 2026)
+## User Decisions (Final — May 10, 2026)
 
-The user needs to answer these before cron setup is complete:
-
-1. **Timing**: Separate 8 AM news briefing, or merged into existing 7 AM morning briefing?
-2. **Delivery**: Full summary in Telegram (longer format) or tight bulleted digest?
-3. **Wiki scope**: Store EVERY day's news in wiki for long-term knowledge, or only high-significance stories?
+- **Timing**: Separate 8 AM PT news briefing (existing 7 AM is calendar/weather)
+- **Delivery**: Bullets + links to original sources (no markdown, raw URLs)
+- **Wiki scope**: Selective ingestion — only stories that are BOTH "will matter in 2 months" AND "connects to AI/VC/startup thesis"
+- **GitHub**: Public repo at https://github.com/ambivalence/hermes-daily-news
 
 ## Testing Checklist
 
