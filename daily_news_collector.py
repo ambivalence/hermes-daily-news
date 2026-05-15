@@ -36,25 +36,25 @@ CATEGORIES = {
     "international": {
         "label": "International / World",
         "feeds": [
-            ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
-            ("BBC News", "https://feeds.bbci.co.uk/news/rss.xml"),
+            ("The Guardian World", "https://www.theguardian.com/world/rss"),
+            ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
+            ("France24", "https://www.france24.com/en/rss"),
             ("NPR World", "https://feeds.npr.org/1002/rss.xml"),
         ],
     },
     "business": {
         "label": "Business & Finance",
         "feeds": [
-            ("BBC Business", "https://feeds.bbci.co.uk/news/business/rss.xml"),
             ("Bloomberg Markets", "https://feeds.bloomberg.com/markets/news.rss"),
             ("CNBC Top News", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"),
             ("WSJ Business", "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"),
             ("NPR Business", "https://feeds.npr.org/1006/rss.xml"),
+            ("The Guardian Business", "https://www.theguardian.com/business/rss"),
         ],
     },
     "ai_tech": {
         "label": "AI & Technology",
         "feeds": [
-            ("BBC Technology", "https://feeds.bbci.co.uk/news/technology/rss.xml"),
             ("TechCrunch", "https://techcrunch.com/feed/"),
             ("Ars Technica", "https://feeds.arstechnica.com/arstechnica/index"),
             ("Wired", "https://www.wired.com/feed/rss"),
@@ -62,6 +62,7 @@ CATEGORIES = {
             ("Hacker News", "https://hnrss.org/frontpage"),
             ("NPR Technology", "https://feeds.npr.org/1019/rss.xml"),
             ("The Verge", "https://www.theverge.com/rss/index.xml"),
+            ("VentureBeat", "https://feeds.feedburner.com/venturebeat/SZYF"),
         ],
     },
 }
